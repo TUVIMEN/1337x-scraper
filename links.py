@@ -16,7 +16,6 @@ import ast
 
 from reliq import RQ
 import requests
-from urllib.parse import urljoin
 
 reliq = RQ(cached=True)
 
@@ -385,7 +384,7 @@ class Links1337x:
                 [0] td .name; {
                     .icon [0] a .icon | "%(href)v",
                     [0] a -class; {
-                        .link @ | "%(href)v",
+                        .link.U @ | "%(href)v",
                         .title @ | "%DT" trim
                     },
                 },
@@ -394,7 +393,7 @@ class Links1337x:
                 .date [0] td .coll-date | "%i",
                 .size [0] td .size | "%i",
                 [0] td .uploader; [0] a; {
-                    .uploader_link @ | "%(href)v",
+                    .uploader_link.U @ | "%(href)v",
                     .uploader @ | "%DT" trim
                 }
             } |
@@ -403,8 +402,6 @@ class Links1337x:
         )
         new = 0
         for i in p["posts"]:
-            i["link"] = urljoin(ref, i["link"])
-            i["uploader_link"] = urljoin(ref, i["uploader_link"])
             i["size"] = self.post_size(i["size"])
             i["date"] = self.post_date(i["date"])
             i["id"] = self.post_id(i["link"])
@@ -423,14 +420,12 @@ class Links1337x:
 
         if len(pagination) > 0:
             lastpage = int(pagination.search(r'[-] a i@B>"[0-9]" | "%i"').strip())
-            nexturl = pagination.search(r'a i@tf>">>" | "%(href)v"')
-            if len(nexturl) > 0:
-                nexturl = urljoin(ref, nexturl)
+            nexturl = pagination.json(r'.u.U a i@tf>">>" | "%(href)v"')["u"]
 
         if len(nexturl) == 0 and page != lastpage:
             print("================== retrying")
             time.sleep(2)
-            return None
+            return
 
         return {"newposts": newposts, "lastpage": lastpage, "nexturl": nexturl}
 
