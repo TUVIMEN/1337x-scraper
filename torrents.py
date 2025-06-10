@@ -17,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from reliq import RQ
 import requests
-from urllib.parse import urljoin
 
 reliq = RQ(cached=True)
 
@@ -468,7 +467,7 @@ class Torrents1337x:
                                 .language strong i@tf>"Language"; [0] span ssub@ | "%DT" trim,
                                 .size strong i@tf>"Total size"; [0] span ssub@ | "%DT" tr "," trim,
                                 strong i@tf>"Uploaded By"; [0] span ssub@; [0] a; {
-                                    .uploader_link @ | "%(href)v",
+                                    .uploader_link.U @ | "%(href)v",
                                     .uploader @ | "%DT" trim
                                 }
                             },
@@ -488,7 +487,7 @@ class Torrents1337x:
                             .size @ | "%t" / sed 's/.* \(([^)]* [a-zA-Z][Bb])\)$/\1/; s/,//g; /^[0-9].* [a-zA-Z][bB]$/!d' "E"
                         } | ,
                         .detail [0] * .torrent-detail; {
-                            .cover * .torrent-image; [0] img | "%(src)v",
+                            .cover.U * .torrent-image; [0] img | "%(src)v",
                             .rating.u span .rating; i style | "%(style)v" / sed "s/.*width: //",
                             div .torrent-category; {
                                 .title [0] B>h[1-6] spre@ | "%DT" trim,
@@ -511,10 +510,6 @@ class Torrents1337x:
         r["uploaded"] = self.post_date(r["uploaded"])
         r["checked"] = self.post_date(r["checked"])
         r["size"] = self.post_size(r["size"])
-        if len(r["uploader_link"]) > 0:
-            r["uploader_link"] = urljoin(ref, r["uploader_link"])
-        if len(r["detail"]["cover"]) > 0:
-            r["detail"]["cover"] = urljoin(ref, r["detail"]["cover"])
         for i, j in enumerate(r["files"]):
             r["files"][i]["size"] = self.post_size(j["size"])
 
