@@ -4,49 +4,18 @@
 
 import os
 import sys
-import random
-import time
 import json
 import re
 from datetime import datetime
-from typing import Tuple
 from pathlib import Path
 import argparse
-import ast
 from concurrent.futures import ThreadPoolExecutor
 
 from reliq import RQ
 import requests
+import treerequests
 
 reliq = RQ(cached=True)
-
-
-def conv_curl_header_to_requests(src: str):
-    r = re.search(r"^\s*([A-Za-z0-9_-]+)\s*:(.*)$", src)
-    if r is None:
-        return None
-    return {r[1]: r[2].strip()}
-
-
-def conv_curl_cookie_to_requests(src: str):
-    r = re.search(r"^\s*([A-Za-z0-9_-]+)\s*=(.*)$", src)
-    if r is None:
-        return None
-    return {r[1]: r[2].strip()}
-
-
-def valid_header(src: str) -> dict:
-    r = conv_curl_header_to_requests(src)
-    if r is None:
-        raise argparse.ArgumentTypeError('Invalid header "{}"'.format(src))
-    return r
-
-
-def valid_cookie(src: str) -> dict:
-    r = conv_curl_cookie_to_requests(src)
-    if r is None:
-        raise argparse.ArgumentTypeError('Invalid cookie "{}"'.format(src))
-    return r
 
 
 def valid_directory(directory: str):
@@ -56,162 +25,12 @@ def valid_directory(directory: str):
         raise argparse.ArgumentTypeError('"{}" is not a directory'.format(directory))
 
 
-def valid_file(directory: str):
-    if os.path.isfile(directory):
-        return directory
-    else:
-        raise argparse.ArgumentTypeError('"{}" is not a file'.format(directory))
-
-
-class RequestError(Exception):
-    pass
-
-
-def bool_get(obj: dict, name: str, otherwise: bool = False) -> bool:
-    x = obj.get(name)
-    if x is None:
-        return otherwise
-    return bool(x)
-
-
-def int_get(obj: dict, name: str, otherwise: int = 0) -> int:
-    x = obj.get(name)
-    if x is None:
-        return otherwise
-    return int(x)
-
-
-def float_get(obj: dict, name: str, otherwise: float = 0) -> float:
-    x = obj.get(name)
-    if x is None:
-        return otherwise
-    return float(x)
-
-
-def dict_get(obj: dict, name: str) -> dict:
-    x = obj.get(name)
-    if not isinstance(x, dict):
-        return {}
-    return x
-
-
-class Session(requests.Session):
-    def __init__(self, **kwargs):
-        super().__init__()
-
-        self.proxies.update(dict_get(kwargs, "proxies"))
-        self.headers.update(dict_get(kwargs, "headers"))
-        self.cookies.update(dict_get(kwargs, "cookies"))
-
-        self.timeout = int_get(kwargs, "timeout", 30)
-        self.verify = bool_get(kwargs, "verify", True)
-        self.allow_redirects = bool_get(kwargs, "allow_redirects", False)
-
-        t = kwargs.get("user_agent")
-        self.user_agent = (
-            t
-            if t is not None
-            else "Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0"
-        )
-
-        self.headers.update({"User-Agent": self.user_agent})
-
-        self.retries = int_get(kwargs, "retries", 3)
-        self.retry_wait = float_get(kwargs, "retry_wait", 60)
-        self.wait = float_get(kwargs, "wait")
-        self.wait_random = int_get(kwargs, "wait_random")
-
-        self.logger = kwargs.get("logger")
-
-    def r_req_try(self, url: str, method: str, retry: bool = False, **kwargs):
-        if not retry:
-            if self.wait != 0:
-                time.sleep(self.wait)
-            if self.wait_random != 0:
-                time.sleep(random.randint(0, self.wait_random + 1) / 1000)
-
-        if self.logger is not None:
-            print(url, file=self.logger)
-
-        if method == "get":
-            return self.get(url, timeout=self.timeout, **kwargs)
-        elif method == "post":
-            return self.post(url, timeout=self.timeout, **kwargs)
-        elif method == "delete":
-            return self.delete(url, timeout=self.timeout, **kwargs)
-        elif method == "put":
-            return self.put(url, timeout=self.timeout, **kwargs)
-
-    def r_req(self, url: str, method: str = "get", **kwargs):
-        tries = self.retries
-        retry_wait = self.retry_wait
-
-        instant_end_code = [400, 401, 402, 403, 404, 410, 412, 414, 421, 505]
-
-        i = 0
-        while True:
-            try:
-                resp = self.r_req_try(url, method, retry=(i != 0), **kwargs)
-            except (
-                requests.ConnectTimeout,
-                requests.ConnectionError,
-                requests.ReadTimeout,
-                requests.exceptions.ChunkedEncodingError,
-                RequestError,
-            ):
-                resp = None
-
-            if resp is None or not (
-                resp.status_code >= 200 and resp.status_code <= 299
-            ):
-                if resp is not None and resp.status_code in instant_end_code:
-                    raise RequestError(
-                        "failed completely {} {}".format(resp.status_code, url)
-                    )
-                if i >= tries:
-                    raise RequestError(
-                        "failed {} {}".format(
-                            "connection" if resp is None else resp.status_code, url
-                        )
-                    )
-                i += 1
-                if retry_wait != 0:
-                    time.sleep(retry_wait)
-            else:
-                return resp
-
-    def get_html(
-        self, url: str, return_cookies: bool = False, **kwargs
-    ) -> Tuple[reliq, str] | Tuple[reliq, str, dict]:
-        resp = self.r_req(url, **kwargs)
-
-        rq = reliq(resp.text, ref=url)
-        ref = rq.ref
-
-        if return_cookies:
-            return (rq, ref, resp.cookies.get_dict())
-        return (rq, ref)
-
-    def get_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, **kwargs)
-        return resp.json()
-
-    def post_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, method="post", **kwargs)
-        return resp.json()
-
-    def delete_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, method="delete", **kwargs)
-        return resp.json()
-
-    def put_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, method="put", **kwargs)
-        return resp.json()
-
-
 class Torrents1337x:
     def __init__(self, path, domain, **kwargs):
-        self.ses = Session(
+        self.ses = treerequests.Session(
+            requests,
+            requests.Session,
+            lambda x, y: treerequests.reliq(x, y, obj=reliq),
             **kwargs,
         )
 
@@ -442,8 +261,8 @@ class Torrents1337x:
             return
 
         try:
-            rq, ref = self.ses.get_html(url)
-        except RequestError:
+            rq = self.ses.get_html(url)
+        except requests.RequestException:
             self.add_failed(p_id)
             return
 
@@ -455,47 +274,47 @@ class Torrents1337x:
         r = json.loads(
             rq.search(
                 r"""
-                    div .page-content; {
-                        .title div .box-info-heading; [0] h1 | "%DT" trim,
-                        .magnet [0] a i@te>"Magnet Download" | "%(href)v",
-                        .tags.a [0] ul .category-name; a | "%Dt\n" / trim "\n" trim,
-                        .infohash div .infohash-box; [0] span | "%i",
-                        ul .list; {
-                            [0] @; {
-                                .category strong i@tf>"Category"; [0] span ssub@ | "%DT" trim,
-                                .type strong i@tf>"Type"; [0] span ssub@ | "%DT" trim,
-                                .language strong i@tf>"Language"; [0] span ssub@ | "%DT" trim,
-                                .size strong i@tf>"Total size"; [0] span ssub@ | "%DT" tr "," trim,
-                                strong i@tf>"Uploaded By"; [0] span ssub@; [0] a; {
-                                    .uploader_link.U @ | "%(href)v",
-                                    .uploader @ | "%DT" trim
-                                }
-                            },
-                            [1] @; {
-                                .downloads.u strong i@tf>"Downloads"; [0] span ssub@ | "%i",
-                                .checked strong i@tf>"Last checked"; [0] span ssub@ | "%i",
-                                .uploaded strong i@tf>"Date uploaded"; [0] span ssub@ | "%i",
-                                .seeders.u strong i@tf>"Seeders"; [0] span ssub@ | "%i",
-                                .leechers.u strong i@tf>"Leechers"; [0] span ssub@ | "%i",
+                div .page-content; {
+                    .title div .box-info-heading; [0] h1 | "%DT" trim,
+                    .magnet [0] a i@te>"Magnet Download" | "%(href)v",
+                    .tags.a [0] ul .category-name; a | "%Dt\n" / trim "\n" trim,
+                    .infohash div .infohash-box; [0] span | "%i",
+                    ul .list; {
+                        [0] @; {
+                            .category strong i@tf>"Category"; [0] span ssub@ | "%DT" trim,
+                            .type strong i@tf>"Type"; [0] span ssub@ | "%DT" trim,
+                            .language strong i@tf>"Language"; [0] span ssub@ | "%DT" trim,
+                            .size strong i@tf>"Total size"; [0] span ssub@ | "%DT" tr "," trim,
+                            strong i@tf>"Uploaded By"; [0] span ssub@; [0] a; {
+                                .uploader_link.U @ | "%(href)v",
+                                .uploader @ | "%DT" trim
                             }
                         },
-                        .description * #description; * c@[1:] child@ | "%Di\n" / sed "s/< *(\/ *)?[Bb][rR] *>/\n/g" "E" tr "\r" " " trim "\n" trim,
-                        .trackers.a * #tracker-list; li; text@ "://" child@ | trim echo "\n" / trim,
-                        .files * #files; ( li )( span .head ); {
-                            .type i class child@ | "%(class)v" / sed "s/^flaticon-//",
-                            .name @ | "%Dt" / trim sed "s/ ([^)]* [a-zA-Z][Bb])$//",
-                            .size @ | "%t" / sed 's/.* \(([^)]* [a-zA-Z][Bb])\)$/\1/; s/,//g; /^[0-9].* [a-zA-Z][bB]$/!d' "E"
-                        } | ,
-                        .detail [0] * .torrent-detail; {
-                            .cover.U * .torrent-image; [0] img | "%(src)v",
-                            .rating.u span .rating; i style | "%(style)v" / sed "s/.*width: //",
-                            div .torrent-category; {
-                                .title [0] B>h[1-6] spre@ | "%DT" trim,
-                                .categories.a span child@ | "%DT" trim echo "\n" / trim,
-                                .description [0] p ssub@ | "%DT" trim
-                            }
+                        [1] @; {
+                            .downloads.u strong i@tf>"Downloads"; [0] span ssub@ | "%i",
+                            .checked strong i@tf>"Last checked"; [0] span ssub@ | "%i",
+                            .uploaded strong i@tf>"Date uploaded"; [0] span ssub@ | "%i",
+                            .seeders.u strong i@tf>"Seeders"; [0] span ssub@ | "%i",
+                            .leechers.u strong i@tf>"Leechers"; [0] span ssub@ | "%i",
+                        }
+                    },
+                    .description * #description; * c@[1:] child@ | "%Di\n" / sed "s/< *(\/ *)?[Bb][rR] *>/\n/g" "E" tr "\r" " " trim "\n" trim,
+                    .trackers.a * #tracker-list; li; text@ "://" child@ | trim echo "\n" / trim,
+                    .files * #files; ( li )( span .head ); {
+                        .type i class child@ | "%(class)v" / sed "s/^flaticon-//",
+                        .name @ | "%Dt" / trim sed "s/ ([^)]* [a-zA-Z][Bb])$//",
+                        .size @ | "%t" / sed 's/.* \(([^)]* [a-zA-Z][Bb])\)$/\1/; s/,//g; /^[0-9].* [a-zA-Z][bB]$/!d' "E"
+                    } | ,
+                    .detail [0] * .torrent-detail; {
+                        .cover.U * .torrent-image; [0] img | "%(src)v",
+                        .rating.u span .rating; i style | "%(style)v" / sed "s/.*width: //",
+                        div .torrent-category; {
+                            .title [0] B>h[1-6] spre@ | "%DT" trim,
+                            .categories.a span child@ | "%DT" trim echo "\n" / trim,
+                            .description [0] p ssub@ | "%DT" trim
                         }
                     }
+                }
                 """
             )
         )
@@ -518,8 +337,8 @@ class Torrents1337x:
     def get_last_post_id_page(self, letter):
         url = self.domain + "/sort-search/" + letter + "/time/desc/1/"
         try:
-            rq, ref = self.ses.get_html(url)
-        except RequestError:
+            rq = self.ses.get_html(url)
+        except requests.RequestException:
             return 0
 
         r = rq.search(
@@ -551,8 +370,8 @@ class Torrents1337x:
             for i in range(start, last):
                 self.get_post("", p_id=i)
         else:
-            step = 500
-            n = 1
+            step = 800
+            n = 0
             with ThreadPoolExecutor(max_workers=threads) as executor:
                 for i in range(start, last, step):
                     for j in executor.map(
@@ -563,7 +382,7 @@ class Torrents1337x:
                     n += 1
                     if n >= 10:
                         self.save_state()
-                        n = 1
+                        n = 0
 
 
 def argparser():
@@ -610,83 +429,7 @@ def argparser():
         default="https://www.1337xx.to",
     )
 
-    request_set = parser.add_argument_group("Request settings")
-    request_set.add_argument(
-        "-w",
-        "--wait",
-        metavar="SECONDS",
-        type=float,
-        help="Sets waiting time for each request to SECONDS",
-    )
-    request_set.add_argument(
-        "-W",
-        "--wait-random",
-        metavar="MILISECONDS",
-        type=int,
-        help="Sets random waiting time for each request to be at max MILISECONDS",
-    )
-    request_set.add_argument(
-        "-r",
-        "--retries",
-        metavar="NUM",
-        type=int,
-        help="Sets number of retries for failed request to NUM",
-    )
-    request_set.add_argument(
-        "--retry-wait",
-        metavar="SECONDS",
-        type=float,
-        help="Sets interval between each retry",
-    )
-    request_set.add_argument(
-        "-m",
-        "--timeout",
-        metavar="SECONDS",
-        type=float,
-        help="Sets request timeout",
-    )
-    request_set.add_argument(
-        "-k",
-        "--insecure",
-        action="store_false",
-        help="Ignore ssl errors",
-    )
-    request_set.add_argument(
-        "-L",
-        "--location",
-        action="store_true",
-        help="Allow for redirections, can be dangerous if credentials are passed in headers",
-    )
-    request_set.add_argument(
-        "-A",
-        "--user-agent",
-        metavar="UA",
-        type=str,
-        help="Sets custom user agent",
-    )
-    request_set.add_argument(
-        "-x",
-        "--proxies",
-        metavar="DICT",
-        type=lambda x: dict(ast.literal_eval(x)),
-        help='Set requests proxies dictionary, e.g. -x \'{"http":"127.0.0.1:8080","ftp":"0.0.0.0"}\'',
-    )
-    request_set.add_argument(
-        "-H",
-        "--header",
-        metavar="HEADER",
-        type=valid_header,
-        action="append",
-        help="Set header, can be used multiple times e.g. -H 'User: Admin' -H 'Pass: 12345'",
-    )
-    request_set.add_argument(
-        "-b",
-        "--cookie",
-        metavar="COOKIE",
-        type=valid_cookie,
-        action="append",
-        help="Set cookie, can be used multiple times e.g. -b 'auth=8f82ab' -b 'PHPSESSID=qw3r8an829'",
-    )
+    treerequests.args_section(parser)
 
     return parser
 
@@ -694,49 +437,14 @@ def argparser():
 def cli(argv: list[str]):
     args = argparser().parse_args(argv)
 
-    headers = {}
-    cookies = {}
-    if args.cookie is not None:
-        for i in args.cookie:
-            cookies.update(i)
-
-    if args.header is not None:
-        for i in args.header:
-            headers.update(i)
-        cookie = headers.get("Cookie")
-        if cookie is not None:
-            headers.pop("Cookie")
-            for i in cookie.split(";"):
-                pair = i.split("=")
-                name = pair[0].strip()
-                val = None
-                if len(pair) > 1:
-                    val = pair[1].strip()
-                cookies.update({name: val})
-
-    directory = args.directory
-    domain = args.domain
-
-    net_settings = {
-        "logger": sys.stdout,
-        "wait": args.wait,
-        "wait_random": args.wait_random,
-        "retries": args.retries,
-        "retry_wait": args.retry_wait,
-        "timeout": args.timeout,
-        "location": args.location,
-        "user_agent": args.user_agent,
-        "verify": args.insecure,
-        "proxies": args.proxies,
-        "headers": headers,
-        "cookies": cookies,
-    }
+    net_settings = {"logger": treerequests.simple_logger(sys.stdout)}
 
     threads = 1
     if args.threads is not None:
         threads = args.threads
 
-    trs = Torrents1337x(directory, domain, **net_settings)
+    trs = Torrents1337x(args.directory, args.domain, **net_settings)
+    treerequests.args_session(trs.ses, args)
 
     for i in args.urls:
         trs.get_post(i)
@@ -749,4 +457,4 @@ def cli(argv: list[str]):
             raise e
 
 
-cli(sys.argv[1:] if sys.argv[1:] else ["-h"])
+cli(sys.argv[1:])

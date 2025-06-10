@@ -398,14 +398,12 @@ def argparser():
 def cli(argv: list[str]):
     args = argparser().parse_args(argv)
 
-    directory = args.directory
-    domain = args.domain
-
     net_settings = {
         "logger": treerequests.simple_logger(sys.stdout),
     }
 
-    lns = Links1337x(directory, domain, **net_settings)
+    lns = Links1337x(args.directory, args.domain, **net_settings)
+    treerequests.args_session(lns.ses, args)
 
     for i in args.keys:
         lns.feed(i)
