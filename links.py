@@ -14,9 +14,11 @@ from pathlib import Path
 import argparse
 import ast
 
-from reliq import reliq
+from reliq import RQ
 import requests
 from urllib.parse import urljoin
+
+reliq = RQ(cached=True)
 
 
 def conv_curl_header_to_requests(src: str):
@@ -112,9 +114,7 @@ class Session(requests.Session):
             else "Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0"
         )
 
-        self.headers.update(
-            {"User-Agent": self.user_agent}
-        )
+        self.headers.update({"User-Agent": self.user_agent})
 
         self.retries = int_get(kwargs, "retries", 3)
         self.retry_wait = float_get(kwargs, "retry_wait", 60)
@@ -122,16 +122,6 @@ class Session(requests.Session):
         self.wait_random = int_get(kwargs, "wait_random")
 
         self.logger = kwargs.get("logger")
-
-    @staticmethod
-    def base(rq: reliq, url: str) -> str:
-        ref = url
-        u = rq.search(r'[0] head; [0] base href=>[1:] | "%(href)v"')
-        if u != "":
-            u = urljoin(url, u)
-            if u != "":
-                ref = u
-        return ref
 
     def r_req_try(self, url: str, method: str, retry: bool = False, **kwargs):
         if not retry:
@@ -195,8 +185,8 @@ class Session(requests.Session):
     ) -> Tuple[reliq, str] | Tuple[reliq, str, dict]:
         resp = self.r_req(url, **kwargs)
 
-        rq = reliq(resp.text)
-        ref = self.base(rq, url)
+        rq = reliq(resp.text, ref=url)
+        ref = rq.ref
 
         if return_cookies:
             return (rq, ref, resp.cookies.get_dict())
