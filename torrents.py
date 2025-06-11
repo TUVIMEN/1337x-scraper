@@ -140,7 +140,11 @@ class Torrents1337x:
             if size[i] == ".":
                 hasdot = 1
             i += 1
-        n = float(size[:i])
+
+        if i == 0:
+            n = 1
+        else:
+            n = float(size[:i])
 
         while i < sizel and size[i].isspace():
             i += 1
@@ -334,8 +338,8 @@ class Torrents1337x:
 
         self.write_post(r)
 
-    def get_last_post_id_page(self, letter):
-        url = self.domain + "/sort-search/" + letter + "/time/desc/1/"
+    def get_last_post_id_page(self, search):
+        url = self.domain + "/sort-search/" + search + "/time/desc/1/"
         try:
             rq = self.ses.get_html(url)
         except requests.RequestException:
@@ -353,8 +357,8 @@ class Torrents1337x:
 
     def get_last_post_id(self):
         r = 0
-        r = max(r, self.get_last_post_id_page("a"))
-        r = max(r, self.get_last_post_id_page("e"))
+        r = max(r, self.get_last_post_id_page("and"))
+        r = max(r, self.get_last_post_id_page("the"))
 
         return r
 
