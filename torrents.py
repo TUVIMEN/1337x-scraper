@@ -391,7 +391,7 @@ class Torrents1337x:
 
 def argparser():
     parser = argparse.ArgumentParser(
-        description="Tool for getting torrents from 1337x",
+        description="Tool for getting torrents from 1337x. If no URLs provided scrapes the whole site",
         add_help=False,
     )
 
