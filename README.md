@@ -655,3 +655,7 @@ Request settings:
   -B, --browser BROWSER
                         Get cookies from specified browser e.g. -B firefox
 ```
+
+# Results
+
+You can see scraped results [here](https://huggingface.co/datasets/hexderm/1337x).
