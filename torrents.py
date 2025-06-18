@@ -460,5 +460,5 @@ def cli(argv: list[str]):
             trs.save_state()
             raise e
 
-
-cli(sys.argv[1:])
+if __name__ == "__main__":
+    cli(sys.argv[1:])
