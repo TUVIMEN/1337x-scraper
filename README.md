@@ -4,7 +4,7 @@ A scraper for 1337x.
 
 The program originally consisted of 2 scripts `torrents.py` and `links.py`, where you would first pass keywords to `links.py` which would search for torrents links by through all pages, by all categories and by all possible ways of sorting (all of that with optimizations). Then it would extract unique keywords from their titles and run continuously until nothing was left. Later links could be scraped by `torrents.py`.
 
-This design was due to me not realizing that you can just iterate over the id's and 95% of them would be correct. Now `torrents.py` handles everything.
+This design was changed due to me not realizing that you can just iterate over the id's and 95% of them would be correct. Now `torrents.py` handles everything.
 
 # output examples
 
@@ -658,4 +658,4 @@ Request settings:
 
 # Results
 
-You can see scraped results [here](https://huggingface.co/datasets/hexderm/1337x).
+You can see scraped results of entire site [here](https://huggingface.co/datasets/hexderm/1337x).
