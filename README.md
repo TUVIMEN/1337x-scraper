@@ -555,13 +555,12 @@ If no urls arguments are given the whole site is scraped, in this case using 6 t
 ```
 
 ```
-usage: torrents.py [-h] [-d DIR] [-t THREADS] [-D DOMAIN] [-w TIME]
-                   [-W MILISECONDS] [-r NUM] [--retry-wait TIME]
-                   [--force-retry] [-m TIME] [-k] [-L] [-A UA] [-x DICT]
-                   [-H HEADER] [-b COOKIE] [-B BROWSER]
+usage: torrents.py [-h] [-d DIR] [-t THREADS] [-D DOMAIN] [-w TIME] [-W TIME] [-r NUM]
+                   [--retry-wait TIME] [--force-retry] [-m TIME] [-k] [-L] [-A UA]
+                   [-x DICT] [-H HEADER] [-b COOKIE] [-B BROWSER]
                    [URL ...]
 
-Tool for getting torrents from 1337x
+Tool for getting torrents from 1337x. If no URLs provided scrapes the whole site
 
 positional arguments:
   URL                   urls
@@ -575,23 +574,22 @@ options:
 
 Request settings:
   -w, --wait TIME       Sets waiting time for each request
-  -W, --wait-random MILISECONDS
-                        Sets random waiting time for each request to be at max
-                        MILISECONDS
+  -W, --wait-random TIME
+                        Sets random waiting time for each request to be from 0 to TIME
   -r, --retries NUM     Sets number of retries for failed request to NUM
   --retry-wait TIME     Sets interval between each retry
   --force-retry         Retry no matter the error
   -m, --timeout TIME    Sets request timeout
   -k, --insecure        Ignore ssl errors
-  -L, --location        Allow for redirections, can be dangerous if
-                        credentials are passed in headers
+  -L, --location        Allow for redirections, can be dangerous if credentials are
+                        passed in headers
   -A, --user-agent UA   Sets custom user agent
   -x, --proxies DICT    Set requests proxies dictionary, e.g. -x
                         '{"http":"127.0.0.1:8080","ftp":"0.0.0.0"}'
-  -H, --header HEADER   Set curl style header, can be used multiple times e.g.
-                        -H 'User: Admin' -H 'Pass: 12345'
-  -b, --cookie COOKIE   Set curl style cookie, can be used multiple times e.g.
-                        -b 'auth=8f82ab' -b 'PHPSESSID=qw3r8an829'
+  -H, --header HEADER   Set curl style header, can be used multiple times e.g. -H
+                        'User: Admin' -H 'Pass: 12345'
+  -b, --cookie COOKIE   Set curl style cookie, can be used multiple times e.g. -b
+                        'auth=8f82ab' -b 'PHPSESSID=qw3r8an829'
   -B, --browser BROWSER
                         Get cookies from specified browser e.g. -B firefox
 ```
@@ -610,16 +608,14 @@ That's why an copycat, [honeypot site is used](https://1337xx.to) by default. I'
 
 Above all the contents on it are well kept and frequently updated, that's why it's perfect for scraping. It also allows for a lot of consecutive requests and doesn't ban ips. I've managed to download the whole 6.4 million pages from a single ip in a week. Using 6 threads which gives me roughly 60 requests per second, above that more and more requests start failing.
 
-
-
 # links.py (no longer required)
 
 Under the working directory it creates `links-keys-found`, `links-keys-used`, `links-saved` files.
 
 ```
-usage: links.py [-f FILE] [-h] [-d DIR] [-D DOMAIN] [-w TIME] [-W MILISECONDS]
-                [-r NUM] [--retry-wait TIME] [--force-retry] [-m TIME] [-k]
-                [-L] [-A UA] [-x DICT] [-H HEADER] [-b COOKIE] [-B BROWSER]
+usage: links.py [-f FILE] [-h] [-d DIR] [-D DOMAIN] [-w TIME] [-W TIME] [-r NUM]
+                [--retry-wait TIME] [--force-retry] [-m TIME] [-k] [-L] [-A UA]
+                [-x DICT] [-H HEADER] [-b COOKIE] [-B BROWSER]
                 [KEY ...]
 
 Tool for getting links from 1337x
@@ -635,23 +631,22 @@ options:
 
 Request settings:
   -w, --wait TIME       Sets waiting time for each request
-  -W, --wait-random MILISECONDS
-                        Sets random waiting time for each request to be at max
-                        MILISECONDS
+  -W, --wait-random TIME
+                        Sets random waiting time for each request to be from 0 to TIME
   -r, --retries NUM     Sets number of retries for failed request to NUM
   --retry-wait TIME     Sets interval between each retry
   --force-retry         Retry no matter the error
   -m, --timeout TIME    Sets request timeout
   -k, --insecure        Ignore ssl errors
-  -L, --location        Allow for redirections, can be dangerous if
-                        credentials are passed in headers
+  -L, --location        Allow for redirections, can be dangerous if credentials are
+                        passed in headers
   -A, --user-agent UA   Sets custom user agent
   -x, --proxies DICT    Set requests proxies dictionary, e.g. -x
                         '{"http":"127.0.0.1:8080","ftp":"0.0.0.0"}'
-  -H, --header HEADER   Set curl style header, can be used multiple times e.g.
-                        -H 'User: Admin' -H 'Pass: 12345'
-  -b, --cookie COOKIE   Set curl style cookie, can be used multiple times e.g.
-                        -b 'auth=8f82ab' -b 'PHPSESSID=qw3r8an829'
+  -H, --header HEADER   Set curl style header, can be used multiple times e.g. -H
+                        'User: Admin' -H 'Pass: 12345'
+  -b, --cookie COOKIE   Set curl style cookie, can be used multiple times e.g. -b
+                        'auth=8f82ab' -b 'PHPSESSID=qw3r8an829'
   -B, --browser BROWSER
                         Get cookies from specified browser e.g. -B firefox
 ```
